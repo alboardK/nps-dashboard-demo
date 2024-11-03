@@ -1,17 +1,18 @@
 """Composant pour l'affichage de la vue d'ensemble NPS."""
 import streamlit as st
 import plotly.graph_objects as go
+import pandas as pd
 from config import COLORS
 
 def get_nps_category(score):
     """Détermine la catégorie NPS en fonction du score."""
+    if pd.isna(score):
+        return "Non renseigné"
     if score >= 8:
         return "Promoteur"
     elif score <= 6:
         return "Détracteur"
     return "Neutre"
-
-# Dans nps_overview.py
 
 def calculate_nps(scores):
     """Calcule le score NPS en ignorant les valeurs manquantes."""
@@ -40,16 +41,6 @@ def calculate_nps(scores):
     
     return nps
 
-def get_nps_category(score):
-    """Détermine la catégorie NPS en fonction du score."""
-    if pd.isna(score):
-        return "Non renseigné"
-    if score >= 8:
-        return "Promoteur"
-    elif score <= 6:
-        return "Détracteur"
-    return "Neutre"
-
 def display_nps_overview(df, seuil):
     """Affiche la vue d'ensemble NPS."""
     st.header("Vue d'ensemble NPS")
@@ -72,55 +63,60 @@ def display_nps_overview(df, seuil):
     current_month = df['Mois'].max()
     current_month_name = df[df['Mois'] == current_month]['Mois_Nom'].iloc[0]
     previous_month = df[df['Mois'] < current_month]['Mois'].max()
-    previous_month_name = df[df['Mois'] == previous_month]['Mois_Nom'].iloc[0]
+    
+    if previous_month is not None:
+        previous_month_name = df[df['Mois'] == previous_month]['Mois_Nom'].iloc[0]
+    else:
+        previous_month_name = "Pas de données antérieures"
     
     current_data = df[df['Mois'] == current_month]
     current_nps = calculate_nps(current_data['Recommandation'])
     
-    previous_data = df[df['Mois'] == previous_month]
-    previous_nps = calculate_nps(previous_data['Recommandation'])
+    if previous_month is not None:
+        previous_data = df[df['Mois'] == previous_month]
+        previous_nps = calculate_nps(previous_data['Recommandation'])
+    else:
+        previous_nps = None
     
     # Affichage du NPS principal dans un cadre stylisé
-    st.markdown("""
-        <style>
-        .nps-box {
-            background-color: #1E1E1E;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .nps-title {
-            color: #FFFFFF;
-            font-size: 1.2em;
-            margin-bottom: 10px;
-        }
-        .nps-value {
-            color: #FFFFFF;
-            font-size: 3em;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .nps-change {
-            font-size: 1.1em;
-            margin-top: 10px;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        delta = current_nps - previous_nps
-        delta_color = "green" if delta >= 0 else "red"
-        delta_symbol = "↑" if delta >= 0 else "↓"
+        st.markdown("""
+            <style>
+            .nps-box {
+                background-color: #1E1E1E;
+                border-radius: 10px;
+                padding: 20px;
+                margin: 20px 0;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .nps-title {
+                color: #FFFFFF;
+                font-size: 1.2em;
+                margin-bottom: 10px;
+            }
+            .nps-value {
+                color: #FFFFFF;
+                font-size: 3em;
+                font-weight: bold;
+                margin: 10px 0;
+            }
+            .nps-change {
+                font-size: 1.1em;
+                margin-top: 10px;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+        
+        delta = current_nps - previous_nps if previous_nps is not None else None
+        delta_color = "green" if delta and delta >= 0 else "red"
+        delta_symbol = "↑" if delta and delta >= 0 else "↓"
         
         st.markdown(f"""
             <div class="nps-box">
                 <div class="nps-title">NPS ce mois-ci</div>
                 <div class="nps-value">{int(current_nps)}%</div>
-                <div class="nps-change" style="color: {delta_color}">
-                    {delta_symbol} {abs(int(delta))}% par rapport à {previous_month_name}
-                </div>
+                {f'<div class="nps-change" style="color: {delta_color}">{delta_symbol} {abs(int(delta))}% par rapport à {previous_month_name}</div>' if delta is not None else ''}
             </div>
             """, unsafe_allow_html=True)
 
