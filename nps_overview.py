@@ -11,21 +11,44 @@ def get_nps_category(score):
         return "Détracteur"
     return "Neutre"
 
+# Dans nps_overview.py
+
 def calculate_nps(scores):
-    """
-    Calcule le score NPS en ignorant les valeurs manquantes.
-    """
-    # Suppression des valeurs manquantes
-    valid_scores = pd.Series(scores).dropna()
+    """Calcule le score NPS en ignorant les valeurs manquantes."""
+    # Vérification si scores est vide ou None
+    if scores is None or len(scores) == 0:
+        return 0
     
+    # Conversion en Series pandas si ce n'est pas déjà le cas
+    if not isinstance(scores, pd.Series):
+        scores = pd.Series(scores)
+    
+    # Suppression des valeurs manquantes
+    valid_scores = scores.dropna()
+    
+    # Vérification s'il reste des scores valides
     if len(valid_scores) == 0:
-        return None
+        return 0
         
+    # Calcul des proportions
     promoters = sum(score >= 8 for score in valid_scores)
     detractors = sum(score <= 6 for score in valid_scores)
     total = len(valid_scores)
     
-    return round((promoters/total - detractors/total) * 100)
+    # Calcul du NPS
+    nps = round((promoters/total - detractors/total) * 100)
+    
+    return nps
+
+def get_nps_category(score):
+    """Détermine la catégorie NPS en fonction du score."""
+    if pd.isna(score):
+        return "Non renseigné"
+    if score >= 8:
+        return "Promoteur"
+    elif score <= 6:
+        return "Détracteur"
+    return "Neutre"
 
 def display_nps_overview(df, seuil):
     """Affiche la vue d'ensemble NPS."""
