@@ -13,17 +13,36 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
+def get_color_style(score, type="nps"):
+    """Retourne le style CSS pour une note donnée."""
+    if pd.isna(score):
+        return "color: gray;"
+        
+    if type == "nps":
+        if score >= 9:
+            return "color: rgb(46, 204, 113);"  # Vert
+        elif score >= 7:
+            return "color: rgb(241, 196, 15);"  # Orange
+        return "color: rgb(231, 76, 60);"  # Rouge
+    else:  # notes sur 5
+        if score >= 4:
+            return "color: rgb(46, 204, 113);"
+        elif score >= 3:
+            return "color: rgb(241, 196, 15);"
+        return "color: rgb(231, 76, 60);"
+    
 def generate_test_data(n_months=12, responses_per_month=50):
     """Génère des données de test avec des valeurs manquantes."""
     print("\nGénération des données de test:")
     
     dates = []
     scores = []
+    reabo_scores = []  # Nouveau: scores de réabonnement
     satisfaction_scores = {k: [] for k in SATISFACTION_CRITERIA.keys()}
     names = []
     emails = []
-    comments = []
+    comments_nps = []  # Nouveau: commentaires NPS
+    comments_reabo = []  # Nouveau: commentaires réabonnement
     
     start_date = datetime.now() - timedelta(days=n_months*30)
 
@@ -32,9 +51,62 @@ def generate_test_data(n_months=12, responses_per_month=50):
         date = start_date + timedelta(days=np.random.randint(0, n_months*30))
         dates.append(date)
         
+        # Score NPS
         score = np.random.choice(range(0, 11), 
                                p=[0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.1, 0.1, 0.15, 0.15, 0.2])
         scores.append(score)
+        
+        # Commentaire NPS basé sur le score
+        if score >= 9:
+            comment_nps = np.random.choice([
+                "Très satisfait des services, équipe au top",
+                "Excellente salle, coachs professionnels",
+                "Super ambiance et équipements de qualité",
+                "Je recommande vivement, personnel attentif"
+            ])
+        elif score >= 7:
+            comment_nps = np.random.choice([
+                "Bonne salle dans l'ensemble",
+                "Services corrects mais quelques points à améliorer",
+                "Satisfait mais des ajustements seraient bienvenus",
+                "Expérience positive avec quelques réserves"
+            ])
+        else:
+            comment_nps = np.random.choice([
+                "Vestiaires pas toujours propres",
+                "Trop de monde aux heures de pointe",
+                "Équipements à moderniser",
+                "Personnel pas toujours disponible"
+            ])
+        comments_nps.append(comment_nps)
+        
+        # Score et commentaire de réabonnement
+        reabo_score = np.random.choice(range(0, 11), 
+                                     p=[0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.1, 0.1, 0.15, 0.15, 0.2])
+        reabo_scores.append(reabo_score)
+        
+        if reabo_score >= 9:
+            comment_reabo = np.random.choice([
+                "Je compte rester fidèle",
+                "Très satisfait, je continue l'aventure",
+                "L'abonnement correspond parfaitement à mes besoins",
+                "Je me sens bien dans cette salle"
+            ])
+        elif reabo_score >= 7:
+            comment_reabo = np.random.choice([
+                "Je verrai selon les évolutions",
+                "En attente de voir les améliorations",
+                "Je reste mais j'attends des changements",
+                "Satisfait pour l'instant"
+            ])
+        else:
+            comment_reabo = np.random.choice([
+                "Je réfléchis à changer de salle",
+                "Déménagement possible",
+                "Je compare avec d'autres salles",
+                "Pas sûr de continuer"
+            ])
+        comments_reabo.append(comment_reabo)
         
         # Pour chaque critère, 15% de chance d'avoir une valeur manquante
         for criteria in SATISFACTION_CRITERIA.keys():
@@ -50,19 +122,29 @@ def generate_test_data(n_months=12, responses_per_month=50):
         last_name = np.random.choice(['Martin', 'Bernard', 'Dubois', 'Robert', 'Richard'])
         names.append(f"{last_name} {first_name}")
         emails.append(f"{first_name.lower()}.{last_name.lower()}@email.com")
-        comments.append(np.random.choice(["Très satisfait", "Service correct", "À améliorer"]))
     
-    # Création du DataFrame
+    # Création du DataFrame avec les nouveaux champs
     data = {
         'Horodateur': pd.to_datetime(dates),
         'Recommandation': scores,
+        'Pourquoi cette note ?': comments_nps,
+        'Reabonnement': reabo_scores,
+        'Pourquoi cette réponse ?': comments_reabo,
         'Nom': names,
         'Email': emails,
-        'Commentaire': comments,
         **satisfaction_scores
     }
     
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+    
+    # Debug prints
+    print("\nDonnées générées:")
+    print("Shape:", df.shape)
+    print("Colonnes:", df.columns.tolist())
+    print("Premières lignes:")
+    print(df.head())
+    
+    return df
 
 def display_satisfaction_metrics(df):
     """Affiche les métriques de satisfaction en ignorant les valeurs manquantes."""
@@ -114,7 +196,7 @@ def calculate_category_average(row, criteria_list):
     return None
 
 def display_detailed_responses(df):
-    """Affiche les réponses détaillées avec aperçu des informations clés."""
+    """Affiche les réponses détaillées avec mise en page améliorée."""
     st.header("Réponses détaillées")
     
     # Filtres de base
@@ -138,73 +220,130 @@ def display_detailed_responses(df):
     
     filtered_df = df[mask].sort_values('Horodateur', ascending=False)
     
-    # Affichage des réponses détaillées
+    # Style CSS pour la mise en page
+    st.markdown("""
+        <style>
+        .metric-box {
+            background-color: rgba(0,0,0,0.05);
+            border-radius: 5px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .score-box {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .comment-box {
+            font-style: italic;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .rating-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Affichage des réponses
     for _, row in filtered_df.head(5).iterrows():
-        # Création de l'aperçu avec les informations clés
-        reabo_value = f"{int(row['Reabonnement'])}/10" if pd.notna(row.get('Reabonnement')) else "n/a"
-        header = (
-            f"{row['Nom']} - {row['Horodateur'].strftime('%d/%m/%Y')}\n"
-            f"NPS: {int(row['Recommandation'])}/10 | Réabonnement: {reabo_value} | "
-            f"Catégorie: {row['Catégorie']}"
-        )
+        nps_style = get_color_style(row['Recommandation'], "nps")
+        reabo_style = get_color_style(row['Reabonnement'], "nps") if pd.notna(row.get('Reabonnement')) else "color: gray;"
         
-        with st.expander(header):
-            # [Reste du code précédent pour l'affichage détaillé...]
-            # Bloc 1 : Scores principaux
-            st.markdown("### 🎯 Scores principaux")
+        # En-tête de l'expander avec résumé
+        header = f"""
+            <div class="metric-box">
+                <div style="font-weight: bold">{row['Nom']} - {row['Horodateur'].strftime('%d/%m/%Y')}</div>
+                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                    <div>
+                        <span style="{nps_style}">NPS: {int(row['Recommandation'])}/10</span>
+                        <span style="margin-left: 10px; color: gray;">- {row['Catégorie']}</span>
+                    </div>
+                    <div style="{reabo_style}">
+                        Réabo: {int(row['Reabonnement']) if pd.notna(row.get('Reabonnement')) else 'n/a'}/10
+                    </div>
+                </div>
+            </div>
+        """
+        
+        with st.expander(header, expanded=False):
+            # Section Évaluation Globale
+            st.markdown("### 🎯 Évaluation globale")
             cols = st.columns(2)
+            
+            # Colonne NPS
             with cols[0]:
-                score_color = "green" if row['Recommandation'] >= 9 else "orange" if row['Recommandation'] >= 7 else "red"
-                st.markdown(f"**Recommandation :** ::{score_color}[{int(row['Recommandation'])}/10]")
+                st.markdown(f"""
+                    <div class="metric-box">
+                        <div class="score-box">
+                            Recommandation: <span style="{nps_style}">{int(row['Recommandation'])}/10</span>
+                        </div>
+                        <div class="comment-box">
+                            {row['Pourquoi cette note ?']}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            # Colonne Réabonnement
             with cols[1]:
                 if pd.notna(row.get('Reabonnement')):
-                    reabo_color = "green" if row['Reabonnement'] >= 8 else "orange" if row['Reabonnement'] >= 6 else "red"
-                    st.markdown(f"**Probabilité de réabonnement :** ::{reabo_color}[{int(row['Reabonnement'])}/10]")
+                    st.markdown(f"""
+                        <div class="metric-box">
+                            <div class="score-box">
+                                Réabonnement: <span style="{reabo_style}">{int(row['Reabonnement'])}/10</span>
+                            </div>
+                            <div class="comment-box">
+                                {row['Pourquoi cette réponse ?']}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
                 else:
-                    st.markdown("**Probabilité de réabonnement :** *n/a*")
+                    st.markdown("""
+                        <div class="metric-box">
+                            <div class="score-box">
+                                Réabonnement: <span style="color: gray;">n/a</span>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
             
-            # Bloc 2 : Commentaire
-            if pd.notna(row['Commentaire']):
-                st.markdown("### 💭 Commentaire")
-                st.info(row['Commentaire'])
+            # Section Notes Détaillées
+            st.markdown("### 📈 Notes détaillées")
             
-            # Bloc 3 : Notes détaillées par catégorie
-            st.markdown("### 📈 Évaluation détaillée")
+            # Affichage en grille des catégories
+            cols = st.columns(2)
+            categories_list = list(METRIC_CATEGORIES.items())
             
-            for category, criteria_list in METRIC_CATEGORIES.items():
-                category_avg = calculate_category_average(row, criteria_list)
-                
-                if category_avg is not None:
-                    st.markdown(f"#### ▶ {category} (moyenne: {category_avg:.1f}/5)")
-                else:
-                    st.markdown(f"#### ▶ {category} (pas de données)")
-                
-                data = []
-                for criteria in criteria_list:
-                    if pd.notna(row[criteria]):
-                        value = f"{row[criteria]}/5"
-                        color = "green" if row[criteria] >= 4 else "orange" if row[criteria] >= 3 else "red"
-                    else:
-                        value = "n/a"
-                        color = "grey"
-                    
-                    data.append({
-                        "Critère": SATISFACTION_CRITERIA[criteria],
-                        "Note": value,
-                        "Couleur": color
-                    })
-                
-                for item in data:
-                    cols = st.columns([3, 1])
-                    with cols[0]:
-                        st.write(f"• {item['Critère']}")
-                    with cols[1]:
-                        if item['Note'] != "n/a":
-                            st.markdown(f"::{item['Couleur']}[{item['Note']}]")
-                        else:
-                            st.markdown(f"*{item['Note']}*")
-                
-                st.markdown("---")
+            for i, col in enumerate(cols):
+                with col:
+                    for j in range(i, len(categories_list), 2):
+                        category, criteria_list = categories_list[j]
+                        st.markdown(f"""
+                            <div class="metric-box">
+                                <div style="font-weight: bold; margin-bottom: 8px;">{category}</div>
+                        """, unsafe_allow_html=True)
+                        
+                        for criteria in criteria_list:
+                            value = row[criteria]
+                            if pd.notna(value):
+                                style = get_color_style(value, "satisfaction")
+                                st.markdown(f"""
+                                    <div style="display: flex; justify-content: space-between; margin: 2px 0;">
+                                        <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                        <span style="{style}">{value}/5</span>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"""
+                                    <div style="display: flex; justify-content: space-between; margin: 2px 0;">
+                                        <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                        <span style="color: gray;">n/a</span>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
 
 def main():
     """Fonction principale de l'application."""
