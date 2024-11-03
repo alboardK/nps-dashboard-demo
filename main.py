@@ -104,12 +104,21 @@ def display_satisfaction_metrics(df):
                 else:
                     metric_container.warning(f"Pas de données pour {SATISFACTION_CRITERIA[criteria]}")
 
+def calculate_category_average(row, criteria_list):
+    """
+    Calcule la moyenne d'une catégorie en ignorant les valeurs manquantes.
+    """
+    values = [row[criteria] for criteria in criteria_list if pd.notna(row[criteria])]
+    if values:
+        return sum(values) / len(values)
+    return None
+
 def display_detailed_responses(df):
-    """Affiche les réponses détaillées en gérant les valeurs manquantes."""
+    """Affiche les réponses détaillées avec aperçu des informations clés."""
     st.header("Réponses détaillées")
     
-    # Filtres
-    col1, col2, col3 = st.columns([2,1,1])
+    # Filtres de base
+    col1, col2 = st.columns([2,1])
     with col1:
         search_term = st.text_input("Rechercher par nom")
     with col2:
@@ -118,15 +127,10 @@ def display_detailed_responses(df):
             ["Promoteur", "Neutre", "Détracteur"],
             default=["Promoteur", "Neutre", "Détracteur"]
         )
-    with col3:
-        show_fields = st.multiselect(
-            "Champs à afficher",
-            list(SATISFACTION_CRITERIA.values()),
-            default=[]
-        )
     
     df['Catégorie'] = df['Recommandation'].apply(get_nps_category)
     
+    # Application des filtres
     mask = (
         df['Catégorie'].isin(categories) &
         (df['Nom'].str.contains(search_term, case=False) if search_term else True)
@@ -134,25 +138,73 @@ def display_detailed_responses(df):
     
     filtered_df = df[mask].sort_values('Horodateur', ascending=False)
     
+    # Affichage des réponses détaillées
     for _, row in filtered_df.head(5).iterrows():
-        with st.expander(f"{row['Nom']} - {row['Horodateur'].strftime('%d/%m/%Y')} - Note: {row['Recommandation']}/10"):
-            col1, col2 = st.columns(2)
+        # Création de l'aperçu avec les informations clés
+        reabo_value = f"{int(row['Reabonnement'])}/10" if pd.notna(row.get('Reabonnement')) else "n/a"
+        header = (
+            f"{row['Nom']} - {row['Horodateur'].strftime('%d/%m/%Y')}\n"
+            f"NPS: {int(row['Recommandation'])}/10 | Réabonnement: {reabo_value} | "
+            f"Catégorie: {row['Catégorie']}"
+        )
+        
+        with st.expander(header):
+            # [Reste du code précédent pour l'affichage détaillé...]
+            # Bloc 1 : Scores principaux
+            st.markdown("### 🎯 Scores principaux")
+            cols = st.columns(2)
+            with cols[0]:
+                score_color = "green" if row['Recommandation'] >= 9 else "orange" if row['Recommandation'] >= 7 else "red"
+                st.markdown(f"**Recommandation :** ::{score_color}[{int(row['Recommandation'])}/10]")
+            with cols[1]:
+                if pd.notna(row.get('Reabonnement')):
+                    reabo_color = "green" if row['Reabonnement'] >= 8 else "orange" if row['Reabonnement'] >= 6 else "red"
+                    st.markdown(f"**Probabilité de réabonnement :** ::{reabo_color}[{int(row['Reabonnement'])}/10]")
+                else:
+                    st.markdown("**Probabilité de réabonnement :** *n/a*")
             
-            with col1:
-                st.write(f"**Email:** {row['Email']}")
-                st.write(f"**Catégorie:** {row['Catégorie']}")
-                if pd.notna(row['Commentaire']):
-                    st.write(f"**Commentaire:** {row['Commentaire']}")
+            # Bloc 2 : Commentaire
+            if pd.notna(row['Commentaire']):
+                st.markdown("### 💭 Commentaire")
+                st.info(row['Commentaire'])
             
-            with col2:
-                if show_fields:
-                    st.write("**Notes détaillées:**")
-                    for field in show_fields:
-                        key = [k for k, v in SATISFACTION_CRITERIA.items() if v == field][0]
-                        if key in row and pd.notna(row[key]):
-                            st.write(f"{field}: {row[key]}/5")
+            # Bloc 3 : Notes détaillées par catégorie
+            st.markdown("### 📈 Évaluation détaillée")
+            
+            for category, criteria_list in METRIC_CATEGORIES.items():
+                category_avg = calculate_category_average(row, criteria_list)
+                
+                if category_avg is not None:
+                    st.markdown(f"#### ▶ {category} (moyenne: {category_avg:.1f}/5)")
+                else:
+                    st.markdown(f"#### ▶ {category} (pas de données)")
+                
+                data = []
+                for criteria in criteria_list:
+                    if pd.notna(row[criteria]):
+                        value = f"{row[criteria]}/5"
+                        color = "green" if row[criteria] >= 4 else "orange" if row[criteria] >= 3 else "red"
+                    else:
+                        value = "n/a"
+                        color = "grey"
+                    
+                    data.append({
+                        "Critère": SATISFACTION_CRITERIA[criteria],
+                        "Note": value,
+                        "Couleur": color
+                    })
+                
+                for item in data:
+                    cols = st.columns([3, 1])
+                    with cols[0]:
+                        st.write(f"• {item['Critère']}")
+                    with cols[1]:
+                        if item['Note'] != "n/a":
+                            st.markdown(f"::{item['Couleur']}[{item['Note']}]")
                         else:
-                            st.write(f"{field}: Non renseigné")
+                            st.markdown(f"*{item['Note']}*")
+                
+                st.markdown("---")
 
 def main():
     """Fonction principale de l'application."""
