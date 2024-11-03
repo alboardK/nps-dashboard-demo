@@ -12,12 +12,19 @@ def get_nps_category(score):
     return "Neutre"
 
 def calculate_nps(scores):
-    """Calcule le score NPS."""
-    if len(scores) == 0:
-        return 0
-    promoters = sum(score >= 8 for score in scores)
-    detractors = sum(score <= 6 for score in scores)
-    total = len(scores)
+    """
+    Calcule le score NPS en ignorant les valeurs manquantes.
+    """
+    # Suppression des valeurs manquantes
+    valid_scores = pd.Series(scores).dropna()
+    
+    if len(valid_scores) == 0:
+        return None
+        
+    promoters = sum(score >= 8 for score in valid_scores)
+    detractors = sum(score <= 6 for score in valid_scores)
+    total = len(valid_scores)
+    
     return round((promoters/total - detractors/total) * 100)
 
 def display_nps_overview(df, seuil):
