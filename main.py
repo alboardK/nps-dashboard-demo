@@ -220,68 +220,55 @@ def display_detailed_responses(df):
     
     filtered_df = df[mask].sort_values('Horodateur', ascending=False)
     
-    # Style CSS pour la mise en page
+    # Style CSS plus compact
     st.markdown("""
         <style>
         .metric-box {
             background-color: rgba(0,0,0,0.05);
             border-radius: 5px;
-            padding: 10px;
-            margin: 5px 0;
+            padding: 8px;
+            margin: 4px 0;
         }
-        .score-box {
-            font-size: 1.2em;
+        .category-box {
+            background-color: rgba(0,0,0,0.05);
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        .category-title {
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
-        .comment-box {
-            font-style: italic;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
-        .rating-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 10px;
+        .rating-line {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+            align-items: center;
         }
         </style>
     """, unsafe_allow_html=True)
     
-    # Affichage des réponses
     for _, row in filtered_df.head(5).iterrows():
-        nps_style = get_color_style(row['Recommandation'], "nps")
-        reabo_style = get_color_style(row['Reabonnement'], "nps") if pd.notna(row.get('Reabonnement')) else "color: gray;"
+        # En-tête simplifié
+        expander_header = (
+            f"{row['Nom']} - {row['Horodateur'].strftime('%d/%m/%Y')}\n"
+            f"NPS: {int(row['Recommandation'])}/10 - {row['Catégorie']}"
+        )
         
-        # En-tête de l'expander avec résumé
-        header = f"""
-            <div class="metric-box">
-                <div style="font-weight: bold">{row['Nom']} - {row['Horodateur'].strftime('%d/%m/%Y')}</div>
-                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                    <div>
-                        <span style="{nps_style}">NPS: {int(row['Recommandation'])}/10</span>
-                        <span style="margin-left: 10px; color: gray;">- {row['Catégorie']}</span>
-                    </div>
-                    <div style="{reabo_style}">
-                        Réabo: {int(row['Reabonnement']) if pd.notna(row.get('Reabonnement')) else 'n/a'}/10
-                    </div>
-                </div>
-            </div>
-        """
-        
-        with st.expander(header, expanded=False):
-            # Section Évaluation Globale
+        with st.expander(expander_header):
+            # Évaluation globale
             st.markdown("### 🎯 Évaluation globale")
             cols = st.columns(2)
             
             # Colonne NPS
             with cols[0]:
+                nps_style = get_color_style(row['Recommandation'], "nps")
                 st.markdown(f"""
                     <div class="metric-box">
-                        <div class="score-box">
+                        <div style="font-weight: bold;">
                             Recommandation: <span style="{nps_style}">{int(row['Recommandation'])}/10</span>
                         </div>
-                        <div class="comment-box">
+                        <div style="font-style: italic; margin-top: 4px;">
                             {row['Pourquoi cette note ?']}
                         </div>
                     </div>
@@ -290,12 +277,13 @@ def display_detailed_responses(df):
             # Colonne Réabonnement
             with cols[1]:
                 if pd.notna(row.get('Reabonnement')):
+                    reabo_style = get_color_style(row['Reabonnement'], "nps")
                     st.markdown(f"""
                         <div class="metric-box">
-                            <div class="score-box">
+                            <div style="font-weight: bold;">
                                 Réabonnement: <span style="{reabo_style}">{int(row['Reabonnement'])}/10</span>
                             </div>
-                            <div class="comment-box">
+                            <div style="font-style: italic; margin-top: 4px;">
                                 {row['Pourquoi cette réponse ?']}
                             </div>
                         </div>
@@ -303,47 +291,109 @@ def display_detailed_responses(df):
                 else:
                     st.markdown("""
                         <div class="metric-box">
-                            <div class="score-box">
+                            <div style="font-weight: bold;">
                                 Réabonnement: <span style="color: gray;">n/a</span>
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
             
-            # Section Notes Détaillées
+            # Notes détaillées
             st.markdown("### 📈 Notes détaillées")
             
-            # Affichage en grille des catégories
-            cols = st.columns(2)
-            categories_list = list(METRIC_CATEGORIES.items())
+            # Disposition en grille 2x2
+            col1, col2 = st.columns(2)
             
-            for i, col in enumerate(cols):
-                with col:
-                    for j in range(i, len(categories_list), 2):
-                        category, criteria_list = categories_list[j]
+            # Première colonne : Expérience et Services
+            with col1:
+                # Bloc Expérience
+                st.markdown('<div class="category-box">', unsafe_allow_html=True)
+                st.markdown('<div class="category-title">Expérience</div>', unsafe_allow_html=True)
+                for criteria in METRIC_CATEGORIES['Expérience']:
+                    value = row[criteria]
+                    if pd.notna(value):
+                        style = get_color_style(value, "satisfaction")
                         st.markdown(f"""
-                            <div class="metric-box">
-                                <div style="font-weight: bold; margin-bottom: 8px;">{category}</div>
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="{style}">{value}/5</span>
+                            </div>
                         """, unsafe_allow_html=True)
-                        
-                        for criteria in criteria_list:
-                            value = row[criteria]
-                            if pd.notna(value):
-                                style = get_color_style(value, "satisfaction")
-                                st.markdown(f"""
-                                    <div style="display: flex; justify-content: space-between; margin: 2px 0;">
-                                        <span>{SATISFACTION_CRITERIA[criteria]}</span>
-                                        <span style="{style}">{value}/5</span>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"""
-                                    <div style="display: flex; justify-content: space-between; margin: 2px 0;">
-                                        <span>{SATISFACTION_CRITERIA[criteria]}</span>
-                                        <span style="color: gray;">n/a</span>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                        
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="color: gray;">n/a</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Bloc Services
+                st.markdown('<div class="category-box">', unsafe_allow_html=True)
+                st.markdown('<div class="category-title">Services</div>', unsafe_allow_html=True)
+                for criteria in METRIC_CATEGORIES['Services']:
+                    value = row[criteria]
+                    if pd.notna(value):
+                        style = get_color_style(value, "satisfaction")
+                        st.markdown(f"""
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="{style}">{value}/5</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="color: gray;">n/a</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Deuxième colonne : Personnel et Infrastructure
+            with col2:
+                # Bloc Personnel
+                st.markdown('<div class="category-box">', unsafe_allow_html=True)
+                st.markdown('<div class="category-title">Personnel</div>', unsafe_allow_html=True)
+                for criteria in METRIC_CATEGORIES['Personnel']:
+                    value = row[criteria]
+                    if pd.notna(value):
+                        style = get_color_style(value, "satisfaction")
+                        st.markdown(f"""
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="{style}">{value}/5</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="color: gray;">n/a</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Bloc Infrastructure
+                st.markdown('<div class="category-box">', unsafe_allow_html=True)
+                st.markdown('<div class="category-title">Infrastructure</div>', unsafe_allow_html=True)
+                for criteria in METRIC_CATEGORIES['Infrastructure']:
+                    value = row[criteria]
+                    if pd.notna(value):
+                        style = get_color_style(value, "satisfaction")
+                        st.markdown(f"""
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="{style}">{value}/5</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                            <div class="rating-line">
+                                <span>{SATISFACTION_CRITERIA[criteria]}</span>
+                                <span style="color: gray;">n/a</span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
 def main():
     """Fonction principale de l'application."""
