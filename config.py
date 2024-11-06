@@ -1,29 +1,30 @@
 """Configuration de l'application."""
 
+# config.py
+
 # Critères de satisfaction
 SATISFACTION_CRITERIA = {
-    'experience_salle': 'Expérience salle de sport',
-    'experience_piscine': 'Expérience piscine',
-    'coaching_groupe': 'Qualité coaching en groupe',
-    'disponibilite_cours': 'Disponibilité des cours',
-    'disponibilite_equipements': 'Disponibilité équipements',
-    'coachs': 'Les coachs',
-    'maitres_nageurs': 'Les maîtres nageurs',
-    'accueil': 'Personnel d\'accueil',
-    'commercial': 'Conseiller sports',
-    'ambiance': 'Ambiance générale',
-    'proprete': 'Propreté générale',
-    'vestiaires': 'Vestiaires',
-    'restauration': 'Offre restauration',
-    'evenements': 'Offre festive'
+    'Satisfaction_Salle': 'Expérience salle de sport',
+    'Satisfaction_Piscine': 'Expérience piscine',
+    'Satisfaction_Coaching': 'Qualité coaching en groupe',
+    'Satisfaction_DispoCours': 'Disponibilité des cours',
+    'Satisfaction_DispoEquipements': 'Disponibilité équipements',
+    'Satisfaction_Coachs': 'Les coachs',
+    'Satisfaction_MNS': 'Les maîtres nageurs',
+    'Satisfaction_Accueil': "Personnel d'accueil",
+    'Satisfaction_Conseiller': 'Conseiller sports',
+    'Satisfaction_Ambiance': 'Ambiance générale',
+    'Satisfaction_Proprete': 'Propreté générale',
+    'Satisfaction_Vestiaires': 'Vestiaires',
+    'Satisfaction_Restauration': 'Offre restauration',
+    'Satisfaction_Festive': 'Offre festive'
 }
 
-# Catégories de métriques
 METRIC_CATEGORIES = {
-    "Expérience": ['experience_salle', 'experience_piscine'],
-    "Personnel": ['coachs', 'maitres_nageurs', 'accueil', 'commercial'],
-    "Services": ['coaching_groupe', 'disponibilite_cours', 'disponibilite_equipements', 'restauration'],
-    "Infrastructure": ['ambiance', 'proprete', 'vestiaires', 'evenements']
+    "Expérience": ['Satisfaction_Salle', 'Satisfaction_Piscine'],
+    "Personnel": ['Satisfaction_Coachs', 'Satisfaction_MNS', 'Satisfaction_Accueil', 'Satisfaction_Conseiller'],
+    "Services": ['Satisfaction_Coaching', 'Satisfaction_DispoCours', 'Satisfaction_DispoEquipements', 'Satisfaction_Restauration'],
+    "Infrastructure": ['Satisfaction_Ambiance', 'Satisfaction_Proprete', 'Satisfaction_Vestiaires', 'Satisfaction_Festive']
 }
 
 # Couleurs pour les graphiques
@@ -36,5 +37,5 @@ COLORS = {
 # Configuration par défaut
 DEFAULT_SETTINGS = {
     'seuil_representativite': 35,
-    'theme': 'Clair'
+    'theme': 'Clair'  # Définir le thème par défaut
 }

@@ -1,156 +1,148 @@
-"""Composant pour l'affichage de la vue d'ensemble NPS."""
+import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-import pandas as pd
-from config import COLORS
+from datetime import datetime
 
+# Couleurs pour les catégories de NPS
+COLORS = {
+    "Promoter": "rgb(46, 204, 113)",
+    "Passive": "rgb(241, 196, 15)",
+    "Detractor": "rgb(231, 76, 60)"
+}
+
+# Fonction pour catégoriser les scores NPS
 def get_nps_category(score):
-    """Détermine la catégorie NPS en fonction du score."""
-    if pd.isna(score):
-        return "Non renseigné"
-    if score >= 8:
-        return "Promoteur"
-    elif score <= 6:
-        return "Détracteur"
-    return "Neutre"
+    try:
+        score = float(score)
+        if score >= 8:
+            return "Promoter"
+        elif score >= 6:
+            return "Passive"
+        else:
+            return "Detractor"
+    except ValueError:
+        return "Unknown"
 
-def calculate_nps(scores):
-    """Calcule le score NPS en ignorant les valeurs manquantes."""
-    # Vérification si scores est vide ou None
-    if scores is None or len(scores) == 0:
-        return 0
+# Fonction pour calculer le NPS pour un mois spécifique
+def calculate_nps(data, target_month):
+    # Filtrer les données pour le mois ciblé et exclure les NaN
+    month_data = data[(data['Date'].dt.to_period('M') == target_month.to_period('M')) & (data['Recommandation'].notna())]
     
-    # Conversion en Series pandas si ce n'est pas déjà le cas
-    if not isinstance(scores, pd.Series):
-        scores = pd.Series(scores)
-    
-    # Suppression des valeurs manquantes
-    valid_scores = scores.dropna()
-    
-    # Vérification s'il reste des scores valides
-    if len(valid_scores) == 0:
-        return 0
-        
-    # Calcul des proportions
-    promoters = sum(score >= 8 for score in valid_scores)
-    detractors = sum(score <= 6 for score in valid_scores)
-    total = len(valid_scores)
-    
-    # Calcul du NPS
-    nps = round((promoters/total - detractors/total) * 100)
-    
-    return nps
+    if month_data.empty:
+        return None  # Pas de données pour ce mois
 
+    # Catégorisation en fonction des scores NPS
+    promoters = month_data[month_data['Recommandation'] >= 8]
+    detractors = month_data[month_data['Recommandation'] <= 5]
+    
+    # Calcul du score NPS
+    nps_score = ((len(promoters) - len(detractors)) / len(month_data)) * 100
+    return nps_score
+
+# Fonction pour trouver le dernier mois avec des données
+def find_last_month_with_data(data, current_month):
+    # Utiliser `Timestamp` pour assurer la compatibilité avec `DateOffset`
+    last_month = current_month - pd.DateOffset(months=1)
+    while last_month >= data['Date'].min():
+        # Vérifier les données pour `last_month` en utilisant `.to_period('M')` pour correspondre à `calculate_nps`
+        if not data[data['Date'].dt.to_period('M') == last_month.to_period('M')].empty:
+            return last_month
+        last_month -= pd.DateOffset(months=1)
+    return None
+
+# Fonction pour afficher l'aperçu du NPS
 def display_nps_overview(df, seuil):
-    """Affiche la vue d'ensemble NPS."""
     st.header("Vue d'ensemble NPS")
     
-    # Vérification des données
-    if df is None or df.empty:
+    if df.empty:
         st.error("Aucune donnée disponible")
         return
-        
-    if 'Horodateur' not in df.columns:
-        st.error("La colonne 'Horodateur' est manquante")
-        return
-    
-    # Préparation des données mensuelles
-    df['Mois'] = df['Horodateur'].dt.strftime('%Y-%m')
-    df['Mois_Nom'] = df['Horodateur'].dt.strftime('%B %Y')
-    df['Catégorie'] = df['Recommandation'].apply(get_nps_category)
-    
-    # NPS actuel
-    current_month = df['Mois'].max()
-    current_month_name = df[df['Mois'] == current_month]['Mois_Nom'].iloc[0]
-    previous_month = df[df['Mois'] < current_month]['Mois'].max()
-    
-    if previous_month is not None:
-        previous_month_name = df[df['Mois'] == previous_month]['Mois_Nom'].iloc[0]
-    else:
-        previous_month_name = "Pas de données antérieures"
-    
-    current_data = df[df['Mois'] == current_month]
-    current_nps = calculate_nps(current_data['Recommandation'])
-    
-    if previous_month is not None:
-        previous_data = df[df['Mois'] == previous_month]
-        previous_nps = calculate_nps(previous_data['Recommandation'])
-    else:
-        previous_nps = None
-    
-    # Affichage du NPS principal dans un cadre stylisé
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        st.markdown("""
-            <style>
-            .nps-box {
-                background-color: #1E1E1E;
-                border-radius: 10px;
+
+    # Calcul des mois actuels et précédents
+    valid_months = df.dropna(subset=['Recommandation']).groupby(df['Date'].dt.to_period("M")).size().index
+    current_month = valid_months.max().to_timestamp()
+    previous_month = find_last_month_with_data(df, current_month)
+
+    # Calcul des NPS actuels et précédents
+    current_nps = calculate_nps(df, current_month)
+    previous_nps = calculate_nps(df, previous_month) if previous_month is not None else None
+    delta = current_nps - previous_nps if previous_nps is not None else None
+    delta_symbol = "↑" if delta and delta >= 0 else "↓"
+    delta_color = "#2ecc71" if delta and delta >= 0 else "#e74c3c"  # Vert pour augmentation, rouge pour diminution
+    previous_month_name = previous_month.strftime("%B %Y") if previous_month else "Pas de données antérieures"
+
+    # Injection de CSS et affichage de la boîte de NPS
+    st.markdown(f"""
+        <style>
+            .nps-container {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
                 padding: 20px;
-                margin: 20px 0;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-            .nps-title {
-                color: #FFFFFF;
-                font-size: 1.2em;
-                margin-bottom: 10px;
-            }
-            .nps-value {
-                color: #FFFFFF;
+                border-radius: 10px;
+                background-color: #333;
+                color: white;
+                margin-bottom: 20px;
+                text-align: center;
+            }}
+            .nps-title {{
+                font-size: 1.5em;
+                font-weight: bold;
+                color: #ecf0f1;
+            }}
+            .nps-value {{
                 font-size: 3em;
                 font-weight: bold;
+                color: #2ecc71;
                 margin: 10px 0;
-            }
-            .nps-change {
-                font-size: 1.1em;
-                margin-top: 10px;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-        
-        delta = current_nps - previous_nps if previous_nps is not None else None
-        delta_color = "green" if delta and delta >= 0 else "red"
-        delta_symbol = "↑" if delta and delta >= 0 else "↓"
-        
-        st.markdown(f"""
-            <div class="nps-box">
-                <div class="nps-title">NPS ce mois-ci</div>
-                <div class="nps-value">{int(current_nps)}%</div>
-                {f'<div class="nps-change" style="color: {delta_color}">{delta_symbol} {abs(int(delta))}% par rapport à {previous_month_name}</div>' if delta is not None else ''}
-            </div>
-            """, unsafe_allow_html=True)
+            }}
+            .nps-change {{
+                font-size: 1.2em;
+                color: {delta_color};
+            }}
+            .nps-subtitle {{
+                font-size: 1em;
+                color: #bdc3c7;
+            }}
+        </style>
 
-    # Graphique avec tooltips et NPS par barre
-    monthly_distribution = df.groupby(['Mois', 'Mois_Nom', 'Catégorie']).size().unstack(fill_value=0)
-    monthly_nps = df.groupby('Mois').apply(lambda x: calculate_nps(x['Recommandation'])).reset_index()
-    monthly_nps.columns = ['Mois', 'NPS']
-    
+        <div class="nps-container">
+            <div class="nps-title">NPS ce mois-ci</div>
+            <div class="nps-value">{f"{int(current_nps)}%" if current_nps is not None else "Non disponible"}</div>
+            <div class="nps-change">{delta_symbol} {abs(int(delta))}% par rapport à {previous_month_name}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Graphique d'évolution du NPS
     fig = go.Figure()
-    
-    for category in ['Détracteur', 'Neutre', 'Promoteur']:
+
+    monthly_distribution = df[df['Date'].dt.to_period("M").isin(valid_months)].groupby([df['Date'].dt.to_period("M"), 'Catégorie']).size().unstack(fill_value=0)
+    monthly_nps = df[df['Date'].dt.to_period("M").isin(valid_months)].groupby(df['Date'].dt.to_period("M")).apply(lambda x: calculate_nps(x, x['Date'].iloc[0])).reset_index()
+    monthly_nps.columns = ['Mois', 'NPS']
+
+    for category in ['Detractor', 'Passive', 'Promoter']:
         fig.add_trace(go.Bar(
             name=category,
-            x=monthly_distribution.index.get_level_values('Mois'),
+            x=monthly_distribution.index.to_timestamp(),
             y=monthly_distribution[category],
             marker_color=COLORS[category],
             hovertemplate="Mois: %{x}<br>" +
                          f"{category}s: %{{y}}<br>" +
                          "<extra></extra>"
         ))
-    
-    # Ajout de la ligne NPS
+
     fig.add_trace(go.Scatter(
-        x=monthly_nps['Mois'],
+        x=monthly_nps['Mois'].dt.to_timestamp(),
         y=monthly_nps['NPS'],
         mode='lines+text',
         name='NPS',
         line=dict(color='white', width=2),
-        text=monthly_nps['NPS'].apply(lambda x: f"{int(x)}%"),
+        text=monthly_nps['NPS'].apply(lambda x: f"{int(x)}%" if pd.notna(x) else "N/A"),
         textposition='top center',
         textfont=dict(size=14, color='white'),
         hovertemplate="NPS: %{text}<br><extra></extra>"
     ))
-    
+
     fig.update_layout(
         barmode='stack',
         title="Évolution mensuelle des réponses",
@@ -161,14 +153,13 @@ def display_nps_overview(df, seuil):
         xaxis=dict(showgrid=False),
         yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
     )
-    
+
     st.plotly_chart(fig, use_container_width=True)
 
-    # Affichage des données mensuelles avec seuil de représentativité
-    monthly_counts = df.groupby('Mois').size()
+    # Détail mensuel
     st.markdown("### Détail mensuel")
-    
-    for month in monthly_distribution.index.get_level_values('Mois'):
+    monthly_counts = df.groupby(df['Date'].dt.to_period("M")).size()
+    for month in monthly_distribution.index:
         count = monthly_counts[month]
         if count < seuil:
             st.warning(f"{month}: {count} réponses (sous le seuil de représentativité)")
