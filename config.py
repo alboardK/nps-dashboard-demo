@@ -6,7 +6,19 @@
 DEFAULT_SETTINGS = {
     'seuil_representativite': 35,
 }
-
+# Configuration de l'authentification
+AUTH_CONFIG = {
+    "users": {
+        "admin": {
+            "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",  # admin123
+            "role": "admin"
+        },
+        "user@annettek.fr": {
+            "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",  # admin123
+            "role": "user"
+        }
+    }
+}
 # Configuration des catégories et métriques
 METRIC_STRUCTURE = {
     'personnel': {

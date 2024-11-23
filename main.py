@@ -5,165 +5,243 @@ from nps_overview import display_nps_overview
 from nps_metrics import display_metrics_details
 from nps_responses import display_responses_details
 from config import DEFAULT_SETTINGS
+import pandas as pd
+from datetime import datetime
+from auth import Authenticator
 
-# Configuration de la page
-st.set_page_config(
-    page_title="NPS Dashboard - Annette K",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed"  # Changé de "expanded" à "collapsed"
-)
+# Configuration globale
+ENABLE_AUTH = True  # Mettre à True pour activer l'authentification
 
-def configure_sidebar():
-    """Configure la barre latérale avec les options de configuration de l'application et applique le thème immédiatement."""
-    with st.sidebar:
-        st.title("⚙️ Configuration")
-        data_source = st.selectbox("Source des données", ["Données réelles", "Données de test"], key="data_source")
-        show_raw_data = st.checkbox("Afficher les données brutes")
-        seuil_representativite = st.number_input(
-            "Seuil de représentativité",
-            min_value=1,
-            value=DEFAULT_SETTINGS['seuil_representativite']
+def display_config_tab(data_source):
+    """Affiche l'onglet de configuration."""
+    st.header("Configuration")
+    
+    if ENABLE_AUTH and st.session_state.get('user_role') != "admin":
+        st.warning("Accès réservé aux administrateurs")
+        return data_source
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:    
+        st.subheader("Source des données")
+        new_data_source = st.selectbox(
+            "Source des données",
+            ["Données réelles", "Données de test"],
+            index=0 if data_source == "Données réelles" else 1
         )
+    
+    with col2:
+        st.markdown("### ")  # Pour aligner avec le selectbox
+        if st.button("🚪 Déconnexion", type="secondary"):
+            st.session_state.authenticated = False
+            st.rerun()
+    
+    # Informations sur l'utilisateur connecté
+    st.markdown("---")
+    st.markdown(f"**Utilisateur connecté :** {st.session_state.get('user', 'Non connecté')}")
+    st.markdown(f"**Rôle :** {st.session_state.get('user_role', 'Non défini')}")
+    
+    return new_data_source
+
+def preprocess_dataframe(df):
+    """Prétraite le DataFrame pour assurer la cohérence des types de données."""
+    if df.empty:
+        return df
         
-        # Choix du thème avec application immédiate du CSS
-        theme = st.radio("Choisir un thème", options=["Clair", "Sombre"], index=1)  # index=1 pour Sombre par défaut
-        
-        # Application des styles CSS globaux selon le thème
-        if theme == "Sombre":
-            st.markdown("""
-                <style>
-                    /* Styles globaux */
-                    .stApp {
-                        background-color: #1E1E1E;
-                        color: white;
-                    }
-                    
-                    /* En-têtes */
-                    .css-10trblm {
-                        color: white;
-                    }
-                    
-                    /* Conteneurs */
-                    .css-1r6slb0, .css-12oz5g7 {
-                        background-color: #2D2D2D;
-                        color: white;
-                    }
-                    
-                    /* Graphiques */
-                    .js-plotly-plot .plotly {
-                        background-color: #2D2D2D !important;
-                    }
-                    
-                    /* Tableaux */
-                    .dataframe {
-                        background-color: #2D2D2D;
-                        color: white;
-                    }
-                    
-                    /* Widgets */
-                    .stSelectbox, .stNumberInput {
-                        background-color: #2D2D2D;
-                        color: white;
-                    }
-                    
-                    /* Onglets */
-                    .stTabs [data-baseweb="tab-list"] {
-                        background-color: #2D2D2D;
-                    }
-                    
-                    .stTabs [data-baseweb="tab"] {
-                        color: white;
-                    }
-                    
-                    /* Cartes et conteneurs */
-                    .nps-container {
-                        background-color: #2D2D2D !important;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
+    # Conversion des colonnes de dates
+    df['Date'] = pd.to_datetime(df['Date'])
+    
+    # Conversion des colonnes numériques
+    numeric_columns = [
+        'Recommandation',
+        'ProbabiliteReabo',
+        'Satisfaction_Salle',
+        'Satisfaction_Piscine',
+        'Satisfaction_Coaching',
+        'Satisfaction_DispoCours',
+        'Satisfaction_DispoEquipements',
+        'Satisfaction_Coachs',
+        'Satisfaction_MNS',
+        'Satisfaction_Accueil',
+        'Satisfaction_Conseiller',
+        'Satisfaction_Ambiance',
+        'Satisfaction_Proprete',
+        'Satisfaction_Vestiaires',
+        'Satisfaction_Restauration',
+        'Satisfaction_Festive',
+        'Satisfaction_Masterclass'
+    ]
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Nettoyage des colonnes textuelles
+    text_columns = ['Nom', 'Prenom', 'Email', 'PourquoiNote', 'PourquoiReabo', 'Ameliorations']
+    for col in text_columns:
+        if col in df.columns:
+            df[col] = df[col].astype(str).replace('nan', '').str.strip()
+    
+    return df
+
+def configure_page():
+    """Configure la page Streamlit."""
+    st.set_page_config(
+        page_title="NPS Dashboard - Annette K",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+    
+    # Application du thème sombre
+    st.markdown("""
+        <style>
+            /* Base theme */
+            .stApp {
+                background-color: #1E1E1E;
+                color: white;
+            }
+            
+            /* Headers */
+            h1, h2, h3, h4, h5, h6 {
+                color: white !important;
+            }
+            
+            /* Login form styling */
+            .stButton button {
+                width: 100%;
+                background-color: #2D2D2D;
+                border: 1px solid #444;
+                color: white;
+            }
+            .stTextInput input {
+                background-color: #2D2D2D;
+                color: white;
+                border: 1px solid #444;
+            }
+            .stTextInput input:focus {
+                border-color: #666;
+                box-shadow: 0 0 0 1px #666;
+            }
+            
+            /* Widgets */
+            .stSelectbox, .stMultiSelect {
+                background-color: #2D2D2D;
+            }
+            
+            /* Metrics containers */
+            .metric-container div {
+                background-color: #2D2D2D !important;
+            }
+            
+            /* Remove padding */
+            .block-container {
+                padding-top: 2rem;
+                padding-bottom: 0rem;
+            }
+            
+            /* Custom scrollbar */
+            ::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+            
+            ::-webkit-scrollbar-track {
+                background: #1E1E1E;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 5px;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+            
+            /* Cacher le menu hamburger et le footer */
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            .stDeployButton {display:none;}
+            
+            /* Login container */
+            [data-testid="stForm"] {
+                background-color: #2D2D2D;
+                padding: 1rem;
+                border-radius: 4px;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+def load_data(use_test_data=False):
+    """Charge et prétraite les données."""
+    try:
+        if use_test_data:
+            df = generate_test_data()
         else:
-            st.markdown("""
-                <style>
-                    /* Styles globaux */
-                    .stApp {
-                        background-color: #FFFFFF;
-                        color: black;
-                    }
-                    
-                    /* En-têtes */
-                    .css-10trblm {
-                        color: black;
-                    }
-                    
-                    /* Conteneurs */
-                    .css-1r6slb0, .css-12oz5g7 {
-                        background-color: #F0F2F6;
-                    }
-                    
-                    /* Graphiques */
-                    .js-plotly-plot .plotly {
-                        background-color: #FFFFFF !important;
-                    }
-                    
-                    /* Tableaux */
-                    .dataframe {
-                        background-color: #FFFFFF;
-                        color: black;
-                    }
-                    
-                    /* Widgets */
-                    .stSelectbox, .stNumberInput {
-                        background-color: #FFFFFF;
-                    }
-                    
-                    /* Onglets */
-                    .stTabs [data-baseweb="tab-list"] {
-                        background-color: #F0F2F6;
-                    }
-                    
-                    .stTabs [data-baseweb="tab"] {
-                        color: black;
-                    }
-                    
-                    /* Cartes et conteneurs */
-                    .nps-container {
-                        background-color: #F0F2F6 !important;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
+            df = load_google_sheet_data()
         
-    return data_source, show_raw_data, seuil_representativite
+        # Prétraitement des données
+        df = preprocess_dataframe(df)
+        return df
+        
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des données: {str(e)}")
+        return pd.DataFrame()
 
 def main():
     """Fonction principale de l'application."""
-    data_source, show_raw_data, seuil_representativite = configure_sidebar()
+    configure_page()
     
-    # Charger les données en fonction de la source sélectionnée
-    if data_source == "Données réelles":
-        df = load_google_sheet_data()
+    # Vérification de sécurité
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    
+    # Gestion de l'authentification
+    if ENABLE_AUTH:
+        authenticator = Authenticator()
+        if not authenticator.login():
+            return
     else:
-        df = generate_test_data()
-
-    # Appliquer le prétraitement des données
-    df = preprocess_data(df)
-
-    # Afficher les données brutes dans la barre latérale si l'option est activée
-    if show_raw_data:
-        st.sidebar.subheader("Données brutes")
-        st.sidebar.dataframe(df)
-
-    # Créer les onglets
-    tabs = st.tabs(["Vue d'ensemble NPS", "Détails des métriques", "Détails des réponses"])
-
-    with tabs[0]:
-        display_nps_overview(df, seuil_representativite)
-
-    with tabs[1]:
+        # En mode développement, définir des valeurs par défaut
+        if not st.session_state.authenticated:
+            st.session_state.authenticated = True
+            st.session_state.user = "dev@annettek.fr"
+            st.session_state.user_role = "admin"
+    
+    # État initial de la source de données
+    if 'data_source' not in st.session_state:
+        st.session_state.data_source = "Données réelles"
+    
+    # Création des onglets
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Vue d'ensemble NPS",
+        "Détails des métriques",
+        "Détails des réponses",
+        "Configuration"
+    ])
+    
+    # Chargement des données
+    df = load_data(use_test_data=(st.session_state.data_source == "Données de test"))
+    
+    if df.empty:
+        st.warning("Aucune donnée n'est disponible.")
+        return
+    
+    with tab1:
+        display_nps_overview(df)
+    
+    with tab2:
         display_metrics_details(df)
-
-    with tabs[2]:
+    
+    with tab3:
         display_responses_details(df)
+    
+    with tab4:
+        new_data_source = display_config_tab(st.session_state.data_source)
+        if new_data_source != st.session_state.data_source:
+            st.session_state.data_source = new_data_source
+            st.rerun()
 
 if __name__ == "__main__":
     main()

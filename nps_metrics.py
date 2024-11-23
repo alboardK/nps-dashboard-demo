@@ -519,3 +519,4 @@ def display_metrics_details(df):
     except Exception as e:
         print(f"DEBUG - Erreur dans display_metrics_details:", str(e))
         st.error("Une erreur est survenue lors de l'affichage des métriques")
+        

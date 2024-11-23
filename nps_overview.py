@@ -51,7 +51,7 @@ def find_last_month_with_data(data, current_month):
     return None
 
 # Fonction pour afficher l'aperçu du NPS
-def display_nps_overview(df, seuil):
+def display_nps_overview(df, seuil=35):
     st.header("Vue d'ensemble NPS")
     
     if df.empty:
