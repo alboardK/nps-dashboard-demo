@@ -17,3 +17,8 @@ __pycache__/
 credentials/
 nps-annette-k-d47ddcca9303.json
 .streamlit/secrets.toml 
+.streamlit/secrets.toml
+__pycache__
+*.pyc
+venv/
+.env
