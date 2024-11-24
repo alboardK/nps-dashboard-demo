@@ -1,25 +1,36 @@
 """Configuration de l'application."""
+import os
+from dotenv import load_dotenv
 
-# config.py
+__all__ = ['DEFAULT_SETTINGS', 'AUTH_CONFIG', 'METRIC_STRUCTURE', 'COLUMN_MAPPING', 'SCORE_COLORS', 'SHEET_ID', 'SHEET_NAME']
+
+# Chargement des variables d'environnement
+load_dotenv()
 
 # Configuration par défaut
 DEFAULT_SETTINGS = {
     'seuil_representativite': 35,
 }
+
 # Configuration de l'authentification
 AUTH_CONFIG = {
     "users": {
         "admin": {
-            "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",  # admin123
+            "password": os.getenv('ADMIN_PASSWORD_HASH', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'),
             "role": "admin"
         },
         "user@annettek.fr": {
-            "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",  # admin123
+            "password": os.getenv('USER_PASSWORD_HASH', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'),
             "role": "user"
         }
     }
 }
-# Configuration des catégories et métriques
+
+# Configurations Google Sheets
+SHEET_ID = os.getenv('SHEET_ID', '1i8TU3c72YH-5sfAKcxmeuthgSeHcW3-ycg7cwzOtkrE')
+SHEET_NAME = os.getenv('SHEET_NAME', 'Réponses')
+
+# Reste de la configuration inchangé
 METRIC_STRUCTURE = {
     'personnel': {
         'label': 'Personnel',
@@ -61,7 +72,7 @@ METRIC_STRUCTURE = {
     }
 }
 
-# Mapping des colonnes du fichier source vers les noms standardisés
+# Mapping des colonnes
 COLUMN_MAPPING = {
     "Notez de 1 à 5 avec 1 pour \"pas du tout satisfait\" et 5 pour \"Parfaitement satisfait\" votre satisfaction sur les services suivants : [les coachs]": "Satisfaction_coachs",
     "Notez de 1 à 5 avec 1 pour \"pas du tout satisfait\" et 5 pour \"Parfaitement satisfait\" votre satisfaction sur les services suivants : [les maitres nageurs]": "Satisfaction_maitres_nageurs",

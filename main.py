@@ -48,8 +48,14 @@ def preprocess_dataframe(df):
     if df.empty:
         return df
         
-    # Conversion des colonnes de dates
-    df['Date'] = pd.to_datetime(df['Date'])
+    # Conversion des dates
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'])
+    
+    # Création/vérification de la colonne Catégorie si elle n'existe pas
+    if 'Recommandation' in df.columns and 'Catégorie' not in df.columns:
+        df['Catégorie'] = df['Recommandation'].apply(lambda x: 
+            'Promoteur' if x >= 9 else ('Passif' if x >= 7 else 'Détracteur'))
     
     # Conversion des colonnes numériques
     numeric_columns = [
@@ -77,7 +83,7 @@ def preprocess_dataframe(df):
             df[col] = pd.to_numeric(df[col], errors='coerce')
     
     # Nettoyage des colonnes textuelles
-    text_columns = ['Nom', 'Prenom', 'Email', 'PourquoiNote', 'PourquoiReabo', 'Ameliorations']
+    text_columns = ['Nom', 'Prenom', 'Email', 'PourquoiNote', 'PourquoiReabo', 'Ameliorations', 'Catégorie']
     for col in text_columns:
         if col in df.columns:
             df[col] = df[col].astype(str).replace('nan', '').str.strip()
@@ -173,7 +179,7 @@ def configure_page():
         </style>
     """, unsafe_allow_html=True)
 
-def load_data(use_test_data=False):
+def load_data(use_test_data=True):
     """Charge et prétraite les données."""
     try:
         if use_test_data:

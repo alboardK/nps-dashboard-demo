@@ -1,5 +1,19 @@
+# Python
 venv/
 __pycache__/
-.env
 *.pyc
+
+# Environment
+.env
+.streamlit/
+.env.local
+.env.*.local
+
+# System
 .DS_Store
+
+# Credentials
+*.json
+credentials/
+nps-annette-k-d47ddcca9303.json
+.streamlit/secrets.toml 
