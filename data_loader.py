@@ -13,21 +13,17 @@ def get_credentials():
     """Récupère les credentials en gérant à la fois le développement local et la production."""
     try:
         # Vérifier d'abord les secrets Streamlit (production)
-        if "GOOGLE_APPLICATION_CREDENTIALS" in st.secrets:
-            credentials_dict = st.secrets.get("GOOGLE_APPLICATION_CREDENTIALS", {})
-            required_keys = [
-                "type", "project_id", "private_key_id", "private_key",
-                "client_email", "client_id", "auth_uri", "token_uri"
-            ]
+        if hasattr(st.secrets, "GOOGLE_APPLICATION_CREDENTIALS"):
+            credentials_dict = dict(st.secrets["GOOGLE_APPLICATION_CREDENTIALS"])
             
-            # Vérification des clés requises
-            missing_keys = [key for key in required_keys if key not in credentials_dict]
-            if missing_keys:
-                raise KeyError(f"Clés manquantes dans la configuration Google: {', '.join(missing_keys)}")
-                
+            # Assurons-nous que la private_key est correctement formatée
+            if "private_key" in credentials_dict:
+                credentials_dict["private_key"] = credentials_dict["private_key"].replace("\\n", "\n")
+            
             return ServiceAccountCredentials.from_json_keyfile_dict(
                 credentials_dict,
-                ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets"]
+                ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
+                 "https://www.googleapis.com/auth/drive"]
             )
         
         # Sinon, chercher le fichier local (développement)
@@ -35,12 +31,17 @@ def get_credentials():
         if local_creds_path.is_file():
             return ServiceAccountCredentials.from_json_keyfile_name(
                 str(local_creds_path),
-                ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets"]
+                ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
+                 "https://www.googleapis.com/auth/drive"]
             )
             
         raise FileNotFoundError("Aucune credential trouvée (ni en local, ni dans Streamlit)")
         
     except Exception as e:
+        if hasattr(st.secrets, "GOOGLE_APPLICATION_CREDENTIALS"):
+            # Log plus détaillé en cas d'erreur avec les secrets Streamlit
+            available_keys = list(st.secrets.GOOGLE_APPLICATION_CREDENTIALS.keys())
+            st.error(f"Erreur credentials. Clés disponibles: {available_keys}")
         st.error(f"Erreur lors de la récupération des credentials: {str(e)}")
         return None
 

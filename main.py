@@ -99,51 +99,74 @@ def configure_page():
         initial_sidebar_state="collapsed"
     )
     
-    # Application du thème sombre
+    # Application du thème sombre avec meilleure lisibilité
     st.markdown("""
         <style>
             /* Base theme */
             .stApp {
                 background-color: #1E1E1E;
-                color: white;
+                color: #E0E0E0;  /* Texte plus clair */
             }
             
             /* Headers */
             h1, h2, h3, h4, h5, h6 {
-                color: white !important;
+                color: #FFFFFF !important;
             }
             
-            /* Login form styling */
-            .stButton button {
-                width: 100%;
-                background-color: #2D2D2D;
-                border: 1px solid #444;
-                color: white;
+            /* Texte standard et labels */
+            p, .streamlit-expanderHeader, label {
+                color: #E0E0E0 !important;
             }
-            .stTextInput input {
-                background-color: #2D2D2D;
-                color: white;
-                border: 1px solid #444;
-            }
-            .stTextInput input:focus {
-                border-color: #666;
-                box-shadow: 0 0 0 1px #666;
+            
+            /* Texte secondaire et sous-titres */
+            .css-1q8dd3e {
+                color: #B0B0B0 !important;
             }
             
             /* Widgets */
             .stSelectbox, .stMultiSelect {
                 background-color: #2D2D2D;
+                color: #E0E0E0;
             }
             
             /* Metrics containers */
             .metric-container div {
                 background-color: #2D2D2D !important;
+                color: #E0E0E0 !important;
             }
             
-            /* Remove padding */
-            .block-container {
-                padding-top: 2rem;
-                padding-bottom: 0rem;
+            /* Messages d'état */
+            .success-message {
+                color: #24A158 !important;
+            }
+            
+            .warning-message {
+                color: #F1C40F !important;
+            }
+            
+            .error-message {
+                color: #E74C3C !important;
+            }
+            
+            /* Stats et chiffres */
+            .stats-number {
+                color: #FFFFFF !important;
+                font-weight: bold;
+            }
+            
+            /* Labels de graphiques */
+            .plotly-graph-text {
+                color: #E0E0E0 !important;
+            }
+            
+            /* Légendes */
+            .legend-text {
+                color: #B0B0B0 !important;
+            }
+            
+            /* Amélioration de la lisibilité des tableaux */
+            .dataframe {
+                color: #E0E0E0 !important;
             }
             
             /* Custom scrollbar */
@@ -170,11 +193,22 @@ def configure_page():
             footer {visibility: hidden;}
             .stDeployButton {display:none;}
             
-            /* Login container */
+            /* Container de login */
             [data-testid="stForm"] {
                 background-color: #2D2D2D;
                 padding: 1rem;
                 border-radius: 4px;
+                color: #E0E0E0;
+            }
+            
+            /* Amélioration de la lisibilité des textes gris */
+            .gray-text, .secondary-text {
+                color: #B0B0B0 !important;  /* Gris plus clair */
+            }
+            
+            /* Style pour les dates et timestamps */
+            .timestamp {
+                color: #A0A0A0 !important;
             }
         </style>
     """, unsafe_allow_html=True)
